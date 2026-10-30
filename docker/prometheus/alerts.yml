@@ -1,0 +1,23 @@
+groups:
+  - name: credit-risk
+    rules:
+      - alert: DataDriftDetected
+        expr: data_drift_detected == 1
+        for: 1m
+        labels: {severity: warning}
+        annotations:
+          summary: "Dérive des données en production"
+          description: "{{ $value }} — la population des demandes a changé. Vérifier le rapport et envisager un réentraînement."
+
+      - alert: HighPredictionLatency
+        expr: histogram_quantile(0.95, sum(rate(prediction_latency_seconds_bucket[5m])) by (le)) > 0.25
+        for: 5m
+        labels: {severity: warning}
+        annotations:
+          summary: "Latence p95 de /predict > 250 ms"
+
+      - alert: PredictionErrors
+        expr: increase(prediction_errors_total[5m]) > 0
+        labels: {severity: critical}
+        annotations:
+          summary: "Erreurs de prédiction sur les 5 dernières minutes"
