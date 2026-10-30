@@ -1,0 +1,26 @@
+# Tous les paramètres du pipeline au même endroit : un changement ici = une nouvelle expérience tracée.
+data:
+  openml_name: credit-g      # German Credit (OpenML) : 1000 demandes de crédit, 20 variables
+  openml_version: 1
+  test_size: 0.2
+  random_state: 42
+
+model:
+  type: gradient_boosting    # gradient_boosting | logistic_regression | random_forest
+  params:
+    n_estimators: 300
+    learning_rate: 0.05
+    max_depth: 3
+    subsample: 0.8
+  decision_threshold: 0.5
+  cv_folds: 5
+
+quality_gate:
+  min_roc_auc: 0.70          # en dessous, l'entraînement échoue et rien n'est déployé
+
+monitoring:
+  psi_threshold: 0.2         # PSI > 0.2 sur une variable = dérive significative
+  drift_share_threshold: 0.3 # alerte si plus de 30 % des variables dérivent
+  min_samples: 50
+  # Variables qui pèsent le plus dans la décision : leur dérive suffit à déclencher l'alerte
+  critical_features: [checking_status, duration, credit_amount, savings_status]

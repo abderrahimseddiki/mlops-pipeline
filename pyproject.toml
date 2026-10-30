@@ -1,0 +1,19 @@
+[project]
+name = "credit-risk-mlops"
+version = "0.1.0"
+description = "Pipeline MLOps de bout en bout : entraînement tracé, quality gate, API conteneurisée, monitoring et détection de dérive."
+requires-python = ">=3.10"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src", "tests"]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
