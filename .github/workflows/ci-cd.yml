@@ -1,0 +1,100 @@
+name: CI/CD
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+env:
+  IMAGE: ghcr.io/${{ github.repository }}
+
+jobs:
+  test:
+    name: Lint & tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - run: pip install -r requirements.txt pytest ruff
+      - run: ruff check src tests
+      - run: pytest -q
+
+  train:
+    name: Train + quality gate
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - name: Train on German Credit (OpenML) — fails if ROC AUC < gate
+        env:
+          PYTHONPATH: src
+          DISABLE_MLFLOW: "1"
+        run: python -m credit_risk.train
+      - name: Publish metrics to the job summary
+        run: |
+          python - <<'EOF' >> "$GITHUB_STEP_SUMMARY"
+          import json
+          m = json.load(open("models/metadata.json"))
+          print(f"### Model {m['model_version']} ({m['model_type']})\n")
+          print("| Metric | Value |\n|---|---|")
+          for k, v in m["metrics"].items():
+              print(f"| {k} | {v} |")
+          EOF
+      - uses: actions/upload-artifact@v4
+        with:
+          name: model
+          path: |
+            models/model.joblib
+            models/metadata.json
+
+  docker:
+    name: Build & publish image
+    needs: train
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: model
+          path: models
+      - uses: docker/setup-buildx-action@v3
+      - name: Log in to GHCR
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build (and push on main)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          load: true
+          push: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+          tags: |
+            ${{ env.IMAGE }}:latest
+            ${{ env.IMAGE }}:${{ github.sha }}
+      - name: Smoke test the container
+        run: |
+          docker run -d --name api -p 8000:8000 ${{ env.IMAGE }}:${{ github.sha }}
+          for i in $(seq 1 30); do curl -sf localhost:8000/health && break; sleep 1; done
+          curl -sf -X POST localhost:8000/predict -H 'Content-Type: application/json' -d '{
+            "checking_status": "<0", "duration": 24, "credit_history": "existing paid", "purpose": "radio/tv",
+            "credit_amount": 3500, "savings_status": "<100", "employment": "1<=X<4", "installment_commitment": 3,
+            "personal_status": "male single", "other_parties": "none", "residence_since": 2,
+            "property_magnitude": "car", "age": 35, "other_payment_plans": "none", "housing": "own",
+            "existing_credits": 1, "job": "skilled", "num_dependents": 1, "own_telephone": "yes",
+            "foreign_worker": "yes"}'
+          docker logs api
