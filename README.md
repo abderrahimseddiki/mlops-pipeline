@@ -97,17 +97,24 @@ docker compose up --build
 
 Jeu de données : [German Credit (OpenML `credit-g`)](https://www.openml.org/d/31) — 1000 demandes, 20 variables, 30 % de mauvais payeurs.
 
-> ⏳ À compléter avec les chiffres du premier entraînement réel (visibles aussi dans le résumé du job « Train » de la CI).
+Mesures réelles (split stratifié 80/20, graine 42, validation croisée 5 folds sur le train) :
 
-| Modèle | ROC AUC (test) | ROC AUC (CV 5 folds) | F1 | Recall |
-|---|---|---|---|---|
-| Gradient Boosting | – | – | – | – |
-| Logistic Regression | – | – | – | – |
+| Modèle | ROC AUC (test) | ROC AUC (CV 5 folds) | F1 | Precision | Recall |
+|---|---|---|---|---|---|
+| **Gradient Boosting** (en production) | **0.804** | **0.789 ± 0.035** | 0.60 | 0.66 | 0.55 |
+| Logistic Regression | 0.804 | 0.771 ± 0.054 | – | – | – |
 
-| Pipeline | Mesure |
+Le Gradient Boosting est retenu pour sa meilleure ROC AUC en validation croisée et sa variance plus faible.
+
+| Démo | Résultat |
 |---|---|
-| Durée CI/CD complète (push → image publiée) | – |
-| Latence p95 de `/predict` | – |
+| Quality gate à 0.85 | Run refusé, modèle de production inchangé (code de sortie 1) |
+| 300 requêtes « normales » | Aucune dérive détectée |
+| 300 requêtes avec clientèle modifiée | 5 variables en dérive dont 3 critiques → alerte (code de sortie 2) |
+| Latence moyenne de `/predict` | ~5.6 ms (600 requêtes, machine locale, hors réseau) |
+
+![Quality gate](docs/img/mlops-slide-2.png)
+![Détection de dérive](docs/img/mlops-slide-6.png)
 
 ## Structure
 
