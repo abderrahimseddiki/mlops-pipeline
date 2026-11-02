@@ -30,7 +30,8 @@ log = logging.getLogger(__name__)
 
 def _git_sha() -> str:
     try:
-        return subprocess.check_output(["git", "rev-parse", "--short", "HEAD"], text=True).strip()
+        cmd = ["git", "rev-parse", "--short", "HEAD"]
+        return subprocess.check_output(cmd, text=True, stderr=subprocess.DEVNULL).strip()
     except (OSError, subprocess.CalledProcessError):
         return "unknown"
 
